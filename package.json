@@ -1,6 +1,6 @@
 {
   "name": "ai-cmd",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Natural-language shell command generation with safe execution for Unix-like terminals.",
   "type": "module",
   "license": "MIT",

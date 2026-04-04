@@ -1,5 +1,5 @@
 export const APP_NAME = "AI-CMD";
-export const APP_VERSION = "1.0.1";
+export const APP_VERSION = "1.0.2";
 export const BRAND_NAME = "Ottili ONE";
 export const BRAND_URL = "ottili.one";
 
