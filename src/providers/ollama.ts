@@ -2,22 +2,18 @@ import type { AppConfig, GenerateObjectRequest, ProviderTextResponse } from "../
 import type { AIProvider } from "./types.js";
 import { ProviderError } from "../utils/errors.js";
 
-type OpenAIChatResponse = {
-  choices?: Array<{
-    message?: {
-      content?: string | Array<{ type?: string; text?: string }>;
-    };
-  }>;
-  error?: {
-    message?: string;
+type OllamaChatResponse = {
+  model?: string;
+  message?: {
+    content?: string;
   };
+  error?: string;
 };
 
-export class OpenAICompatibleProvider implements AIProvider {
-  public constructor(
-    public readonly name: "openai" | "vllm",
-    private readonly config: AppConfig
-  ) {}
+export class OllamaProvider implements AIProvider {
+  public readonly name = "ollama" as const;
+
+  public constructor(private readonly config: AppConfig) {}
 
   public async generateObject(
     input: GenerateObjectRequest
@@ -26,22 +22,17 @@ export class OpenAICompatibleProvider implements AIProvider {
     const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
 
     try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json"
-      };
-
-      if (this.config.apiKey) {
-        headers.Authorization = `Bearer ${this.config.apiKey}`;
-      }
-
-      const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+      const response = await fetch(`${this.config.baseUrl}/chat`, {
         method: "POST",
-        headers,
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
           model: this.config.model,
-          temperature: input.temperature ?? 0.1,
-          response_format: {
-            type: "json_object"
+          stream: false,
+          format: input.jsonSchema,
+          options: {
+            temperature: input.temperature ?? 0.1
           },
           messages: [
             {
@@ -57,23 +48,17 @@ export class OpenAICompatibleProvider implements AIProvider {
         signal: controller.signal
       });
 
-      const data = (await response.json()) as OpenAIChatResponse;
+      const data = (await response.json()) as OllamaChatResponse;
 
       if (!response.ok) {
         throw new ProviderError(
-          data.error?.message
-            ? `Provider request failed: ${data.error.message}`
+          data.error
+            ? `Provider request failed: ${data.error}`
             : `Provider request failed with status ${response.status}.`
         );
       }
 
-      const message = data.choices?.[0]?.message?.content;
-      const rawText = Array.isArray(message)
-        ? message
-            .map((part) => part.text)
-            .filter((part): part is string => typeof part === "string")
-            .join("")
-        : message;
+      const rawText = data.message?.content;
 
       if (!rawText || rawText.trim().length === 0) {
         throw new ProviderError("Provider returned an empty response.");
@@ -81,7 +66,7 @@ export class OpenAICompatibleProvider implements AIProvider {
 
       return {
         provider: this.name,
-        model: this.config.model,
+        model: data.model ?? this.config.model,
         rawText
       };
     } catch (error) {

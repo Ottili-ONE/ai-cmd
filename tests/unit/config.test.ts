@@ -62,4 +62,43 @@ describe("loadConfig", () => {
       })
     ).rejects.toThrowError(/invalid JSON/i);
   });
+
+  it("loads Ollama defaults without requiring an API key", async () => {
+    const config = await loadConfig({
+      env: {
+        AI_PROVIDER: "ollama"
+      },
+      readConfigFile: async () => JSON.stringify({})
+    });
+
+    expect(config.provider).toBe("ollama");
+    expect(config.model).toBe("gemma3:4b");
+    expect(config.baseUrl).toBe("http://localhost:11434/api");
+    expect(config.apiKey).toBeUndefined();
+  });
+
+  it("loads vLLM defaults without requiring an API key", async () => {
+    const config = await loadConfig({
+      env: {
+        AI_PROVIDER: "vllm"
+      },
+      readConfigFile: async () => JSON.stringify({})
+    });
+
+    expect(config.provider).toBe("vllm");
+    expect(config.model).toBe("google/gemma-3-4b-it");
+    expect(config.baseUrl).toBe("http://localhost:8000/v1");
+    expect(config.apiKey).toBeUndefined();
+  });
+
+  it("rejects unsupported providers with a clear error", async () => {
+    await expect(
+      loadConfig({
+        env: {
+          AI_PROVIDER: "anthropic"
+        },
+        readConfigFile: async () => JSON.stringify({})
+      })
+    ).rejects.toThrowError(/Supported providers: openai, ollama, vllm/i);
+  });
 });

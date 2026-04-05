@@ -44,7 +44,7 @@ This project is part of the **Ottili ONE ecosystem** — a modular AI system for
 - Clipboard copy support
 - Optional execution with confirmation
 - Heuristic risk classification for destructive commands
-- OpenAI-compatible provider abstraction
+- Configurable provider abstraction for OpenAI, Ollama, and vLLM
 - JSON mode for scripting
 
 ## Installation
@@ -69,22 +69,43 @@ npm link
 
 Environment variables take precedence over the config file.
 
-If no API key is configured yet, `ai-cmd` creates a starter config file for you on first run.
+If OpenAI is selected and no API key is configured yet, `ai-cmd` creates a starter config file for you on first run.
 
-### Required
+### OpenAI
+
+OpenAI remains the default provider:
 
 ```bash
 export AI_API_KEY="your-api-key"
-```
-
-### Optional
-
-```bash
 export AI_PROVIDER="openai"
 export AI_MODEL="gpt-5.4-mini"
 export AI_BASE_URL="https://api.openai.com/v1"
 export AI_TIMEOUT_MS="30000"
 ```
+
+### Ollama
+
+Use a local Ollama model such as Gemma:
+
+```bash
+export AI_PROVIDER="ollama"
+export AI_MODEL="gemma3:4b"
+export AI_BASE_URL="http://localhost:11434/api"
+```
+
+No API key is required for the default local Ollama setup.
+
+### vLLM
+
+Use a local or self-hosted OpenAI-compatible vLLM server:
+
+```bash
+export AI_PROVIDER="vllm"
+export AI_MODEL="google/gemma-3-4b-it"
+export AI_BASE_URL="http://localhost:8000/v1"
+```
+
+No API key is required for a local vLLM server unless you configured auth yourself.
 
 ### Example config file
 
@@ -100,7 +121,7 @@ export AI_TIMEOUT_MS="30000"
 }
 ```
 
-If configuration is missing, `ai-cmd` fails clearly:
+If OpenAI configuration is missing, `ai-cmd` fails clearly:
 
 ```text
 Missing AI_API_KEY. Set it in your environment or edit ~/.ai-cmd/config.json. A starter config has been created if it did not already exist.
@@ -263,7 +284,6 @@ Example shape:
 
 ## Roadmap
 
-- additional provider adapters
 - richer shell support
 - more precise filesystem-aware risk detection
 - Homebrew distribution

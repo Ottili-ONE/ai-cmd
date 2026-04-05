@@ -7,7 +7,7 @@ export type ServiceManager =
   | "rc-service"
   | "launchctl"
   | "unknown";
-export type ProviderName = "openai";
+export type ProviderName = "openai" | "ollama" | "vllm";
 
 export interface PlatformContext {
   os: OperatingSystem;
@@ -39,7 +39,7 @@ export interface CommandSuggestion extends ProviderCommandPayload {
 export interface AppConfig {
   provider: ProviderName;
   model: string;
-  apiKey: string;
+  apiKey?: string;
   baseUrl: string;
   timeoutMs: number;
 }
