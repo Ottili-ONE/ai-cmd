@@ -5,7 +5,7 @@ import path from "node:path";
 import { execa } from "execa";
 
 const repoRoot = process.cwd();
-const packageNames = ["ai-cmd", "ai-chat", "ai-ask"];
+const packageNames = ["ai-cmd", "ai-chat", "ai-ask", "@ottili_one/ai-chat"];
 const filesToCopy = ["dist", "README.md", "LICENSE"];
 
 async function createPackageDirectory(tempRoot, packageName) {
@@ -35,25 +35,34 @@ async function main() {
   const token = process.env.NPM_TOKEN ?? process.env.NODE_AUTH_TOKEN;
 
   if (!token) {
-    throw new Error("Set NPM_TOKEN or NODE_AUTH_TOKEN before running publish-variants.");
+    throw new Error(
+      "Set NPM_TOKEN or NODE_AUTH_TOKEN before running publish-variants."
+    );
   }
 
   const tempRoot = await mkdtemp(path.join(tmpdir(), "ai-cmd-publish-"));
   const npmrcPath = path.join(tempRoot, ".npmrc");
 
   try {
-    await writeFile(npmrcPath, "//registry.npmjs.org/:_authToken=${NPM_TOKEN}\n");
+    await writeFile(
+      npmrcPath,
+      "//registry.npmjs.org/:_authToken=${NPM_TOKEN}\n"
+    );
 
     for (const packageName of packageNames) {
       const packageDir = await createPackageDirectory(tempRoot, packageName);
-      await execa("npm", ["publish", "--access", "public", "--userconfig", npmrcPath], {
-        cwd: packageDir,
-        stdio: "inherit",
-        env: {
-          ...process.env,
-          NPM_TOKEN: token
+      await execa(
+        "npm",
+        ["publish", "--access", "public", "--userconfig", npmrcPath],
+        {
+          cwd: packageDir,
+          stdio: "inherit",
+          env: {
+            ...process.env,
+            NPM_TOKEN: token
+          }
         }
-      });
+      );
     }
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
