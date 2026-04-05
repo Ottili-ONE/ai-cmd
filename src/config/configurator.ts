@@ -89,6 +89,32 @@ export function createConfiguratorPromptAdapter(): ConfiguratorPromptAdapter {
   };
 }
 
+async function promptForRequiredText(options: {
+  prompt: ConfiguratorPromptAdapter;
+  message: string;
+  initial?: string;
+  errorMessage: string;
+}): Promise<string> {
+  const value = await options.prompt.text(options.message, options.initial);
+
+  if (value.length === 0) {
+    throw new ConfigurationError(options.errorMessage);
+  }
+
+  return value;
+}
+
+function ensureValidUrl(value: string, providerLabel: string): string {
+  try {
+    return new URL(value).toString().replace(/\/$/u, "");
+  } catch (error) {
+    throw new ConfigurationError(
+      `${providerLabel} base URL must be a valid URL.`,
+      error
+    );
+  }
+}
+
 export async function runConfigurator(
   options: ConfigureAppOptions = {}
 ): Promise<AppConfig> {
@@ -106,6 +132,21 @@ export async function runConfigurator(
   const apiKey = providerConfig.requiresApiKey
     ? await prompt.password(`API Key for ${providerConfig.label}`)
     : await prompt.text(`API Key for ${providerConfig.label} (optional)`);
+  const model = await promptForRequiredText({
+    prompt,
+    message: `Model for ${providerConfig.label}`,
+    initial: providerConfig.model,
+    errorMessage: `${providerConfig.label} requires a model name.`
+  });
+  const baseUrl = ensureValidUrl(
+    await promptForRequiredText({
+      prompt,
+      message: `Base URL for ${providerConfig.label}`,
+      initial: providerConfig.baseUrl,
+      errorMessage: `${providerConfig.label} requires a base URL.`
+    }),
+    providerConfig.label
+  );
 
   if (providerConfig.requiresApiKey && apiKey.length === 0) {
     throw new ConfigurationError(
@@ -128,8 +169,8 @@ export async function runConfigurator(
 
   const config: AppConfig = {
     provider,
-    model: providerConfig.model,
-    baseUrl: providerConfig.baseUrl,
+    model,
+    baseUrl,
     timeoutMs: 30_000,
     analytics,
     ...(apiKey ? { apiKey } : {}),
