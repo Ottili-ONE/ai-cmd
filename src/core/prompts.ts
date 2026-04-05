@@ -9,6 +9,7 @@ export function buildGenerateObjectRequest(options: {
   platform: PlatformContext;
   explainRequested: boolean;
   history: ConversationTurn[];
+  workspaceContext?: string;
 }): GenerateObjectRequest {
   const schema = {
     type: "object",
@@ -67,6 +68,9 @@ export function buildGenerateObjectRequest(options: {
     "Conversation context:",
     historyBlock,
     "",
+    "Workspace context:",
+    options.workspaceContext ?? "Unavailable.",
+    "",
     `Explain output requested: ${options.explainRequested ? "yes" : "no"}`,
     `User question: ${options.question}`,
     "",
@@ -76,6 +80,7 @@ export function buildGenerateObjectRequest(options: {
     "Rules:",
     "- command must be a single string on one line",
     "- do not return multiple alternatives",
+    "- use workspace context when it helps choose project-aware commands",
     "- use assumptions only when needed",
     "- use platformNotes for short platform-specific caveats"
   ].join("\n");
@@ -84,7 +89,8 @@ export function buildGenerateObjectRequest(options: {
     systemPrompt,
     userPrompt,
     schemaName: "command_suggestion",
-    schemaDescription: "A single shell command suggestion for the current environment.",
+    schemaDescription:
+      "A single shell command suggestion for the current environment.",
     jsonSchema: schema,
     temperature: 0.1
   };

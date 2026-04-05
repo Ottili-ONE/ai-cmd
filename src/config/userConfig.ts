@@ -1,44 +1,28 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 
 import { DEFAULT_CONFIG_PATH, getEnvValue } from "./env.js";
+import { providerDefaults } from "./providerCatalog.js";
 import type { AppConfig, ProviderName } from "../types/index.js";
 import { ConfigurationError } from "../utils/errors.js";
 
-const providerSchema = z.enum(["openai", "ollama", "vllm"]);
-
-const providerDefaults: Record<
-  ProviderName,
-  {
-    model: string;
-    baseUrl: string;
-    requiresApiKey: boolean;
-  }
-> = {
-  openai: {
-    model: "gpt-5.4-mini",
-    baseUrl: "https://api.openai.com/v1",
-    requiresApiKey: true
-  },
-  ollama: {
-    model: "gemma3:4b",
-    baseUrl: "http://localhost:11434/api",
-    requiresApiKey: false
-  },
-  vllm: {
-    model: "google/gemma-3-4b-it",
-    baseUrl: "http://localhost:8000/v1",
-    requiresApiKey: false
-  }
-};
+const providerSchema = z.enum([
+  "openai",
+  "anthropic",
+  "ollama",
+  "google",
+  "vllm"
+]);
 
 const partialConfigSchema = z.object({
   provider: providerSchema.optional(),
   model: z.string().min(1).optional(),
   apiKey: z.string().min(1).optional(),
   baseUrl: z.string().url().optional(),
-  timeoutMs: z.number().int().positive().optional()
+  timeoutMs: z.number().int().positive().optional(),
+  analytics: z.boolean().optional(),
+  analyticsId: z.string().uuid().optional()
 });
 
 const finalConfigSchema = z.object({
@@ -46,7 +30,9 @@ const finalConfigSchema = z.object({
   model: z.string().min(1),
   apiKey: z.string().min(1).optional(),
   baseUrl: z.string().url(),
-  timeoutMs: z.number().int().positive()
+  timeoutMs: z.number().int().positive(),
+  analytics: z.boolean(),
+  analyticsId: z.string().uuid().optional()
 });
 
 export type LoadConfigOptions = {
@@ -61,8 +47,32 @@ const DEFAULT_CONFIG_TEMPLATE = {
   model: "gpt-5.4-mini",
   apiKey: "your-api-key-here",
   baseUrl: "https://api.openai.com/v1",
-  timeoutMs: 30_000
+  timeoutMs: 30_000,
+  analytics: false
 };
+
+export async function configFileExists(
+  configPath = DEFAULT_CONFIG_PATH
+): Promise<boolean> {
+  try {
+    await access(configPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function saveUserConfig(
+  config: AppConfig,
+  configPath = DEFAULT_CONFIG_PATH
+): Promise<void> {
+  await mkdir(path.dirname(configPath), { recursive: true });
+  await writeFile(
+    `${configPath}`,
+    `${JSON.stringify(config, null, 2)}\n`,
+    "utf8"
+  );
+}
 
 export async function ensureDefaultConfigScaffold(
   configPath: string
@@ -101,7 +111,9 @@ export async function loadUserConfig(
       ...(validated.model ? { model: validated.model } : {}),
       ...(validated.apiKey ? { apiKey: validated.apiKey } : {}),
       ...(validated.baseUrl ? { baseUrl: validated.baseUrl } : {}),
-      ...(validated.timeoutMs ? { timeoutMs: validated.timeoutMs } : {})
+      ...(validated.timeoutMs ? { timeoutMs: validated.timeoutMs } : {}),
+      analytics: validated.analytics ?? false,
+      ...(validated.analyticsId ? { analyticsId: validated.analyticsId } : {})
     };
   } catch (error) {
     if ((error as NodeJS.ErrnoException)?.code === "ENOENT") {
@@ -140,7 +152,7 @@ export async function loadConfig(
 
   if (!providerResult.success) {
     throw new ConfigurationError(
-      "Invalid AI provider. Supported providers: openai, ollama, vllm.",
+      "Invalid AI provider. Supported providers: openai, anthropic, ollama, google, vllm.",
       providerResult.error.flatten()
     );
   }
@@ -152,12 +164,16 @@ export async function loadConfig(
     provider,
     model: getEnvValue(env, "AI_MODEL") ?? fileConfig.model ?? defaults.model,
     apiKey: getEnvValue(env, "AI_API_KEY") ?? fileConfig.apiKey,
-    baseUrl: getEnvValue(env, "AI_BASE_URL") ?? fileConfig.baseUrl ?? defaults.baseUrl,
+    baseUrl:
+      getEnvValue(env, "AI_BASE_URL") ?? fileConfig.baseUrl ?? defaults.baseUrl,
     timeoutMs:
       Number.parseInt(
-        getEnvValue(env, "AI_TIMEOUT_MS") ?? String(fileConfig.timeoutMs ?? 30_000),
+        getEnvValue(env, "AI_TIMEOUT_MS") ??
+          String(fileConfig.timeoutMs ?? 30_000),
         10
-      ) || 30_000
+      ) || 30_000,
+    analytics: fileConfig.analytics ?? false,
+    analyticsId: fileConfig.analyticsId
   };
 
   const parsed = finalConfigSchema.safeParse(merged);
@@ -170,7 +186,10 @@ export async function loadConfig(
       );
     }
 
-    throw new ConfigurationError("Invalid AI configuration.", parsed.error.flatten());
+    throw new ConfigurationError(
+      "Invalid AI configuration.",
+      parsed.error.flatten()
+    );
   }
 
   if (defaults.requiresApiKey && !parsed.data.apiKey) {
@@ -185,6 +204,10 @@ export async function loadConfig(
     model: parsed.data.model,
     baseUrl: parsed.data.baseUrl,
     timeoutMs: parsed.data.timeoutMs,
+    analytics: parsed.data.analytics,
+    ...(parsed.data.analyticsId
+      ? { analyticsId: parsed.data.analyticsId }
+      : {}),
     ...(parsed.data.apiKey ? { apiKey: parsed.data.apiKey } : {})
   };
 }

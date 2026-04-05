@@ -44,7 +44,10 @@ This project is part of the **Ottili ONE ecosystem** — a modular AI system for
 - Clipboard copy support
 - Optional execution with confirmation
 - Heuristic risk classification for destructive commands
-- Configurable provider abstraction for OpenAI, Ollama, and vLLM
+- First-run configurator for provider, API key, and analytics consent
+- Configurable provider abstraction for OpenAI, Anthropic, Google, Ollama, and vLLM
+- Workspace-aware command generation based on the current folder
+- Opt-in anonymous analytics with separate error reporting
 - JSON mode for scripting
 
 ## Installation
@@ -69,7 +72,13 @@ npm link
 
 Environment variables take precedence over the config file.
 
-If OpenAI is selected and no API key is configured yet, `ai-cmd` creates a starter config file for you on first run.
+If required configuration is missing and you launch `ai-cmd` interactively, a first-run configurator opens and asks for:
+
+- AI provider
+- API key
+- analytics consent
+
+If you opt in, `config.json` stores `"analytics": true` and a random anonymous install id. If you opt out, it stores `"analytics": false`.
 
 ### OpenAI
 
@@ -81,6 +90,24 @@ export AI_PROVIDER="openai"
 export AI_MODEL="gpt-5.4-mini"
 export AI_BASE_URL="https://api.openai.com/v1"
 export AI_TIMEOUT_MS="30000"
+```
+
+### Anthropic
+
+```bash
+export AI_PROVIDER="anthropic"
+export AI_API_KEY="your-anthropic-key"
+export AI_MODEL="claude-sonnet-4-20250514"
+export AI_BASE_URL="https://api.anthropic.com/v1"
+```
+
+### Google
+
+```bash
+export AI_PROVIDER="google"
+export AI_API_KEY="your-google-ai-key"
+export AI_MODEL="gemini-2.5-flash"
+export AI_BASE_URL="https://generativelanguage.googleapis.com/v1beta"
 ```
 
 ### Ollama
@@ -117,9 +144,39 @@ No API key is required for a local vLLM server unless you configured auth yourse
   "model": "gpt-5.4-mini",
   "apiKey": "your-api-key",
   "baseUrl": "https://api.openai.com/v1",
-  "timeoutMs": 30000
+  "timeoutMs": 30000,
+  "analytics": false
 }
 ```
+
+### Analytics
+
+Analytics are opt-in only.
+
+When enabled, `ai-cmd` sends anonymous usage events to:
+
+```text
+https://tracking.ottili.one/api/aicmd
+```
+
+Usage events include:
+
+- anonymous install count
+- CLI starts
+- prompt count
+
+Error reports can include:
+
+- prompt
+- OS
+- version
+- timestamp
+
+Regular usage analytics do not store generated command content.
+
+Analytics requests now use a short-lived server-issued session plus proof-of-work. This does not create perfect authentication for a public open-source client, but it makes automated spam substantially harder and gives the server something real to validate.
+
+Server setup notes live in [docs/analytics-server.md](docs/analytics-server.md).
 
 If OpenAI configuration is missing, `ai-cmd` fails clearly:
 
@@ -138,6 +195,8 @@ ai "show disk usage" --json
 ai "remove node_modules and reinstall packages" --exec
 ai "find all jpg files" --copy
 ```
+
+`ai-cmd` now inspects the current folder structure and common project files like `package.json`, `Makefile`, `Cargo.toml`, `go.mod`, and compose files so it can suggest commands that fit the active workspace better.
 
 ### Interactive mode
 

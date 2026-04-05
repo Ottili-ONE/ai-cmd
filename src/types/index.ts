@@ -1,5 +1,10 @@
 export type RiskLevel = "low" | "medium" | "high";
-export type OperatingSystem = "linux" | "macos" | "wsl" | "unix" | "unsupported";
+export type OperatingSystem =
+  | "linux"
+  | "macos"
+  | "wsl"
+  | "unix"
+  | "unsupported";
 export type ShellType = "bash" | "zsh" | "sh" | "unknown";
 export type ServiceManager =
   | "systemctl"
@@ -7,7 +12,12 @@ export type ServiceManager =
   | "rc-service"
   | "launchctl"
   | "unknown";
-export type ProviderName = "openai" | "ollama" | "vllm";
+export type ProviderName =
+  | "openai"
+  | "anthropic"
+  | "ollama"
+  | "google"
+  | "vllm";
 
 export interface PlatformContext {
   os: OperatingSystem;
@@ -42,6 +52,8 @@ export interface AppConfig {
   apiKey?: string;
   baseUrl: string;
   timeoutMs: number;
+  analytics: boolean;
+  analyticsId?: string;
 }
 
 export interface GenerateObjectRequest {
@@ -70,6 +82,7 @@ export interface GenerateCommandOptions {
   provider: AIProvider;
   explainRequested?: boolean;
   history?: ConversationTurn[];
+  workspaceContext?: string;
 }
 
 export interface OutputOptions {
@@ -93,4 +106,28 @@ export interface CliOptions {
 export interface PromptAdapter {
   confirm(message: string, initial?: boolean): Promise<boolean>;
   text(message: string): Promise<string>;
+}
+
+export interface AnalyticsClient {
+  trackCliStart(payload: {
+    os: string;
+    shell: string;
+    provider: ProviderName;
+    mode: "interactive" | "one-shot";
+  }): Promise<void>;
+  trackPromptSent(payload: {
+    os: string;
+    shell: string;
+    provider: ProviderName;
+    mode: "interactive" | "one-shot";
+  }): Promise<void>;
+  trackError(payload: {
+    prompt?: string;
+    os?: string;
+    shell?: string;
+    provider?: ProviderName;
+    message: string;
+    code?: string;
+    time: string;
+  }): Promise<void>;
 }

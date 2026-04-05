@@ -14,7 +14,9 @@ import { enforceExecutionPolicy } from "../safety/executionPolicy.js";
 import { runCommand } from "../exec/runCommand.js";
 import type {
   AIProvider,
+  AnalyticsClient,
   PlatformContext,
+  ProviderName,
   PromptAdapter
 } from "../types/index.js";
 import {
@@ -26,15 +28,9 @@ import {
 import { formatReplBanner } from "../utils/branding.js";
 import type { Logger } from "../utils/logger.js";
 
-function resolveReplCommand(inputValue: string):
-  | "help"
-  | "last"
-  | "explain"
-  | "run"
-  | "copy"
-  | "clear"
-  | "exit"
-  | undefined {
+function resolveReplCommand(
+  inputValue: string
+): "help" | "last" | "explain" | "run" | "copy" | "clear" | "exit" | undefined {
   const normalized = inputValue.trim().toLowerCase();
 
   if (normalized === "help") {
@@ -72,14 +68,20 @@ async function copyCommand(command: string): Promise<void> {
   try {
     await clipboardy.write(command);
   } catch (error) {
-    throw new ClipboardError("Clipboard unavailable. Command printed below instead.", error);
+    throw new ClipboardError(
+      "Clipboard unavailable. Command printed below instead.",
+      error
+    );
   }
 }
 
 export async function startRepl(options: {
   platform: PlatformContext;
   provider: AIProvider;
+  providerName: ProviderName;
   prompt: PromptAdapter;
+  analytics: AnalyticsClient;
+  workspaceContext?: string;
   color: boolean;
   logger: Logger;
 }): Promise<void> {
@@ -94,7 +96,9 @@ export async function startRepl(options: {
   process.once("SIGINT", handleSigint);
 
   try {
-    output.write(`${formatReplBanner()}\nInteractive mode. Type help for commands.\n`);
+    output.write(
+      `${formatReplBanner()}\nInteractive mode. Type help for commands.\n`
+    );
 
     while (true) {
       let line: string;
@@ -147,7 +151,9 @@ export async function startRepl(options: {
         }
 
         if (replCommand === "explain" && lastSuggestion) {
-          output.write(`${formatExplanationOnly(lastSuggestion, options.color)}\n`);
+          output.write(
+            `${formatExplanationOnly(lastSuggestion, options.color)}\n`
+          );
           continue;
         }
 
@@ -199,12 +205,22 @@ export async function startRepl(options: {
           continue;
         }
 
+        await options.analytics.trackPromptSent({
+          os: options.platform.os,
+          shell: options.platform.shell,
+          provider: options.providerName,
+          mode: "interactive"
+        });
+
         const suggestion = await generateCommand({
           question: inputValue,
           platform: options.platform,
           provider: options.provider,
           explainRequested: true,
-          history: session.getHistory()
+          history: session.getHistory(),
+          ...(options.workspaceContext
+            ? { workspaceContext: options.workspaceContext }
+            : {})
         });
 
         session.remember(inputValue, suggestion);
@@ -225,6 +241,15 @@ export async function startRepl(options: {
           continue;
         }
 
+        await options.analytics.trackError({
+          prompt: inputValue,
+          os: options.platform.os,
+          shell: options.platform.shell,
+          provider: options.providerName,
+          message: getErrorMessage(error),
+          time: new Date().toISOString(),
+          ...(error instanceof Error ? { code: error.name } : {})
+        });
         output.write(`${getErrorMessage(error)}\n`);
       }
     }

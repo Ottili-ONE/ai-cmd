@@ -21,6 +21,7 @@ describe("loadConfig", () => {
     expect(config.apiKey).toBe("env-key");
     expect(config.model).toBe("gpt-env");
     expect(config.baseUrl).toBe("https://example.com/v1");
+    expect(config.analytics).toBe(false);
   });
 
   it("throws a clear error when the API key is missing", async () => {
@@ -75,6 +76,7 @@ describe("loadConfig", () => {
     expect(config.model).toBe("gemma3:4b");
     expect(config.baseUrl).toBe("http://localhost:11434/api");
     expect(config.apiKey).toBeUndefined();
+    expect(config.analytics).toBe(false);
   });
 
   it("loads vLLM defaults without requiring an API key", async () => {
@@ -89,16 +91,67 @@ describe("loadConfig", () => {
     expect(config.model).toBe("google/gemma-3-4b-it");
     expect(config.baseUrl).toBe("http://localhost:8000/v1");
     expect(config.apiKey).toBeUndefined();
+    expect(config.analytics).toBe(false);
+  });
+
+  it("loads Anthropic defaults when selected", async () => {
+    const config = await loadConfig({
+      env: {
+        AI_PROVIDER: "anthropic",
+        AI_API_KEY: "anthropic-key"
+      },
+      readConfigFile: async () => JSON.stringify({})
+    });
+
+    expect(config.provider).toBe("anthropic");
+    expect(config.model).toBe("claude-sonnet-4-20250514");
+    expect(config.baseUrl).toBe("https://api.anthropic.com/v1");
+    expect(config.apiKey).toBe("anthropic-key");
+  });
+
+  it("loads Google defaults when selected", async () => {
+    const config = await loadConfig({
+      env: {
+        AI_PROVIDER: "google",
+        AI_API_KEY: "google-key"
+      },
+      readConfigFile: async () => JSON.stringify({})
+    });
+
+    expect(config.provider).toBe("google");
+    expect(config.model).toBe("gemini-2.5-flash");
+    expect(config.baseUrl).toBe(
+      "https://generativelanguage.googleapis.com/v1beta"
+    );
+    expect(config.apiKey).toBe("google-key");
+  });
+
+  it("reads the analytics opt-in from config.json", async () => {
+    const config = await loadConfig({
+      env: {},
+      readConfigFile: async () =>
+        JSON.stringify({
+          provider: "openai",
+          apiKey: "file-key",
+          analytics: true,
+          analyticsId: "76f7075b-1d24-46d3-b037-78c4b6460a4b"
+        })
+    });
+
+    expect(config.analytics).toBe(true);
+    expect(config.analyticsId).toBe("76f7075b-1d24-46d3-b037-78c4b6460a4b");
   });
 
   it("rejects unsupported providers with a clear error", async () => {
     await expect(
       loadConfig({
         env: {
-          AI_PROVIDER: "anthropic"
+          AI_PROVIDER: "unknown-provider"
         },
         readConfigFile: async () => JSON.stringify({})
       })
-    ).rejects.toThrowError(/Supported providers: openai, ollama, vllm/i);
+    ).rejects.toThrowError(
+      /Supported providers: openai, anthropic, ollama, google, vllm/i
+    );
   });
 });

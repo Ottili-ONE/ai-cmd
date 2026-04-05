@@ -27,7 +27,8 @@ const config: AppConfig = {
   model: "gpt-test",
   apiKey: "test-key",
   baseUrl: "https://example.com/v1",
-  timeoutMs: 1_000
+  timeoutMs: 1_000,
+  analytics: false
 };
 
 const platform: PlatformContext = {
@@ -47,6 +48,11 @@ function createDeps(options: {
     loadConfig: async () => config,
     detectPlatformContext: async () => platform,
     createProvider: () => new FakeProvider(options.rawText),
+    createAnalyticsClient: () => ({
+      trackCliStart: vi.fn().mockResolvedValue(undefined),
+      trackPromptSent: vi.fn().mockResolvedValue(undefined),
+      trackError: vi.fn().mockResolvedValue(undefined)
+    }),
     createPromptAdapter: () =>
       options.prompt ?? {
         confirm: vi.fn().mockResolvedValue(true),
@@ -66,18 +72,18 @@ function createDeps(options: {
 async function captureOutput(run: () => Promise<void>) {
   let stdout = "";
   let stderr = "";
-  const stdoutSpy = vi
-    .spyOn(process.stdout, "write")
-    .mockImplementation(((chunk: string | Uint8Array) => {
-      stdout += chunk.toString();
-      return true;
-    }) as typeof process.stdout.write);
-  const stderrSpy = vi
-    .spyOn(process.stderr, "write")
-    .mockImplementation(((chunk: string | Uint8Array) => {
-      stderr += chunk.toString();
-      return true;
-    }) as typeof process.stderr.write);
+  const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(((
+    chunk: string | Uint8Array
+  ) => {
+    stdout += chunk.toString();
+    return true;
+  }) as typeof process.stdout.write);
+  const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(((
+    chunk: string | Uint8Array
+  ) => {
+    stderr += chunk.toString();
+    return true;
+  }) as typeof process.stderr.write);
 
   try {
     await run();
@@ -102,7 +108,10 @@ describe("CLI integration", () => {
     });
 
     const { stdout } = await captureOutput(() =>
-      runCli(["node", "ai", "how", "do", "I", "restart", "nginx", "--no-color"], deps)
+      runCli(
+        ["node", "ai", "how", "do", "I", "restart", "nginx", "--no-color"],
+        deps
+      )
     );
 
     expect(stdout).toContain("systemctl restart nginx");
@@ -147,7 +156,10 @@ describe("CLI integration", () => {
     });
 
     await captureOutput(() =>
-      runCli(["node", "ai", "install", "dependencies", "--exec", "--no-color"], deps)
+      runCli(
+        ["node", "ai", "install", "dependencies", "--exec", "--no-color"],
+        deps
+      )
     );
 
     expect(prompt.confirm).toHaveBeenCalledOnce();
@@ -183,7 +195,7 @@ describe("CLI integration", () => {
     );
 
     expect(stdout).toContain("AI-CMD");
-    expect(stdout).toContain("v. 1.0.2");
+    expect(stdout).toContain("v. 1.0.3");
     expect(stdout).toContain("Powered by Ottili ONE");
     expect(stdout).toContain("ottili.one");
   });

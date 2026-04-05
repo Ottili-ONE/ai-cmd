@@ -38,12 +38,12 @@ class FakeProvider implements AIProvider {
 
 async function captureOutput(run: () => Promise<void>) {
   let stdout = "";
-  const stdoutSpy = vi
-    .spyOn(process.stdout, "write")
-    .mockImplementation(((chunk: string | Uint8Array) => {
-      stdout += chunk.toString();
-      return true;
-    }) as typeof process.stdout.write);
+  const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(((
+    chunk: string | Uint8Array
+  ) => {
+    stdout += chunk.toString();
+    return true;
+  }) as typeof process.stdout.write);
 
   try {
     await run();
@@ -76,9 +76,15 @@ describe("startRepl", () => {
           cwdName: "project"
         },
         provider: new FakeProvider(),
+        providerName: "openai",
         prompt: {
           confirm: vi.fn().mockResolvedValue(true),
           text: vi.fn().mockResolvedValue("EXECUTE HIGH RISK COMMAND")
+        },
+        analytics: {
+          trackCliStart: vi.fn().mockResolvedValue(undefined),
+          trackPromptSent: vi.fn().mockResolvedValue(undefined),
+          trackError: vi.fn().mockResolvedValue(undefined)
         },
         color: false,
         logger: {

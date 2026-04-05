@@ -13,7 +13,10 @@ export async function generateCommand(
     question: options.question,
     platform: options.platform,
     explainRequested: options.explainRequested ?? true,
-    history: options.history ?? []
+    history: options.history ?? [],
+    ...(options.workspaceContext
+      ? { workspaceContext: options.workspaceContext }
+      : {})
   });
 
   const response = await options.provider.generateObject(request);
@@ -21,7 +24,9 @@ export async function generateCommand(
   const platformNotes = [
     ...(payload.platformNotes ?? []),
     ...(options.platform.os === "unsupported"
-      ? ["Detected unsupported host OS; generated a best-effort Unix-style command."]
+      ? [
+          "Detected unsupported host OS; generated a best-effort Unix-style command."
+        ]
       : [])
   ];
 
