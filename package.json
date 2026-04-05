@@ -1,5 +1,5 @@
 {
-  "name": "ai-cmd",
+  "name": "ai-chat",
   "version": "1.0.4",
   "description": "Natural-language shell command generation with safe execution for Unix-like terminals.",
   "type": "module",
@@ -65,5 +65,9 @@
     "typescript": "^5.8.2",
     "typescript-eslint": "^8.28.0",
     "vitest": "^3.0.9"
+  },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/Ottili-ONE"
   }
 }
