@@ -23,7 +23,7 @@ describe("runCommand", () => {
     await expect(
       runCommand("echo safe; echo injected", { stdio: "pipe" })
     ).rejects.toMatchObject({
-      code: "EXECUTION_ERROR",
+      code: "EXECUTION_POLICY_ERROR",
       message:
         "Shell control syntax is not supported for direct execution. Copy and run the command manually after reviewing it."
     });
