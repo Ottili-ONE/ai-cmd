@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { runCommand, needsShellExecution } from "../../src/exec/runCommand.js";
-import { ExecutionError } from "../../src/utils/errors.js";
+import { needsShellExecution, runCommand } from "../../src/exec/runCommand.js";
 
 describe("runCommand", () => {
   it("executes simple commands without a shell", async () => {
@@ -27,6 +26,6 @@ describe("runCommand", () => {
       code: "EXECUTION_ERROR",
       message:
         "Shell control syntax is not supported for direct execution. Copy and run the command manually after reviewing it."
-    } satisfies Partial<ExecutionError>);
+    });
   });
 });
