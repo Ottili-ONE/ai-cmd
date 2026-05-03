@@ -1,7 +1,7 @@
 import { execa } from "execa";
 import { parse as parseShellCommand } from "shell-quote";
 
-import { ExecutionError } from "../utils/errors.js";
+import { ExecutionError, ExecutionPolicyError } from "../utils/errors.js";
 
 export interface RunCommandOptions {
   cwd?: string;
@@ -16,7 +16,7 @@ function parseCommandTokens(command: string): string[] {
   const parsed = parseShellCommand(command);
 
   if (parsed.some((part) => typeof part !== "string")) {
-    throw new ExecutionError(SHELL_SYNTAX_ERROR_MESSAGE);
+    throw new ExecutionPolicyError(SHELL_SYNTAX_ERROR_MESSAGE);
   }
 
   return parsed
@@ -64,7 +64,7 @@ export async function runCommand(
       stderr: result.stderr ?? ""
     };
   } catch (error) {
-    if (error instanceof ExecutionError) {
+    if (error instanceof ExecutionError || error instanceof ExecutionPolicyError) {
       throw error;
     }
 
