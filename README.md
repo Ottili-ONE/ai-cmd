@@ -248,6 +248,7 @@ Execution rules:
 - high risk commands always require an explicit confirmation phrase
 - `--yes` never bypasses the high-risk confirmation path
 - unsupported host OSes can still generate best-effort Unix-style commands, but execution is disabled
+- commands that require shell control syntax such as pipes, command chaining, redirects, or substitutions are blocked from direct execution and should be copied for manual review instead
 
 Example high-risk confirmation:
 
