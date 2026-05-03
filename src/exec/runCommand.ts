@@ -1,4 +1,4 @@
-import { execa, execaCommand } from "execa";
+import { execa } from "execa";
 import { parse as parseShellCommand } from "shell-quote";
 
 import { ExecutionError } from "../utils/errors.js";
@@ -9,11 +9,27 @@ export interface RunCommandOptions {
   stdio?: "inherit" | "pipe";
 }
 
-const SHELL_REQUIRED_PATTERN =
-  /[|&;<>()$`*?[\]{}]|\b(?:if|then|fi|for|do|done|while|case)\b|^\s*[A-Za-z_][A-Za-z0-9_]*=/;
+const SHELL_SYNTAX_ERROR_MESSAGE =
+  "Shell control syntax is not supported for direct execution. Copy and run the command manually after reviewing it.";
+
+function parseCommandTokens(command: string): string[] {
+  const parsed = parseShellCommand(command);
+
+  if (parsed.some((part) => typeof part !== "string")) {
+    throw new ExecutionError(SHELL_SYNTAX_ERROR_MESSAGE);
+  }
+
+  return parsed
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
 
 export function needsShellExecution(command: string): boolean {
-  return SHELL_REQUIRED_PATTERN.test(command);
+  try {
+    return parseShellCommand(command).some((part) => typeof part !== "string");
+  } catch {
+    return true;
+  }
 }
 
 export async function runCommand(
@@ -21,35 +37,7 @@ export async function runCommand(
   options: RunCommandOptions = {}
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   try {
-    if (needsShellExecution(command)) {
-      const executionOptions = {
-        ...(options.cwd ? { cwd: options.cwd } : {}),
-        ...(options.env ? { env: options.env } : {}),
-        stdio: options.stdio ?? "inherit",
-        reject: false as const,
-        shell: true as const
-      };
-      const result = await execaCommand(command, {
-        ...executionOptions
-      });
-
-      if (result.exitCode !== 0) {
-        throw new ExecutionError(
-          `Command failed with exit code ${result.exitCode}.`,
-          result.stderr || result.stdout
-        );
-      }
-
-      return {
-        exitCode: result.exitCode ?? 0,
-        stdout: result.stdout ?? "",
-        stderr: result.stderr ?? ""
-      };
-    }
-
-    const tokens = parseShellCommand(command).filter(
-      (part): part is string => typeof part === "string"
-    );
+    const tokens = parseCommandTokens(command);
     const [file, ...args] = tokens;
 
     if (!file) {
