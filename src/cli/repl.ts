@@ -94,7 +94,8 @@ export async function startRepl(options: {
   };
 
   process.once("SIGINT", handleSigint);
-
+  // Track if we encountered a fatal error that should cause exit
+  let fatalReplError: unknown = undefined;
   try {
     output.write(
       `${formatReplBanner()}\nInteractive mode. Type help for commands.\n`
@@ -241,6 +242,7 @@ export async function startRepl(options: {
           continue;
         }
 
+        // Always log REPL errors to analytics
         await options.analytics.trackError({
           prompt: inputValue,
           os: options.platform.os,
@@ -251,10 +253,31 @@ export async function startRepl(options: {
           ...(error instanceof Error ? { code: error.name } : {})
         });
         output.write(`${getErrorMessage(error)}\n`);
+
+        // On persistent provider or transport errors, set flag and exit loop
+        fatalReplError = error;
+        break;
       }
     }
   } finally {
     process.removeListener("SIGINT", handleSigint);
     rl.close();
+    // If a fatal error occurred, surface clear exit and nonzero code for CLI
+    if (fatalReplError) {
+      // Try to report again if not done above
+      const errorMsg = getErrorMessage(fatalReplError);
+      void options.analytics.trackError({
+        prompt: "[REPL fatal error]",
+        os: options.platform.os,
+        shell: options.platform.shell,
+        provider: options.providerName,
+        message: errorMsg,
+        time: new Date().toISOString(),
+        ...(fatalReplError instanceof Error ? { code: fatalReplError.name } : {})
+      });
+      output.write(`\nEncountered a fatal error in REPL. Exiting.\n`);
+      // eslint-disable-next-line no-process-exit
+      process.exit(1);
+    }
   }
 }
