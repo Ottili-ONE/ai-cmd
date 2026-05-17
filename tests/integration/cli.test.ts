@@ -94,6 +94,10 @@ async function captureOutput(run: () => Promise<void>) {
   }
 }
 
+
+beforeEach(() => {
+  process.exitCode = 0;
+});
 afterEach(() => {
   process.exitCode = 0;
 });
