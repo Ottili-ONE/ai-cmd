@@ -1,4 +1,4 @@
-import clipboardy from "clipboardy";
+import { copyToClipboard as copyClipboard } from "./clipboard.js";
 import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 
@@ -64,16 +64,7 @@ function resolveReplCommand(
   return undefined;
 }
 
-async function copyCommand(command: string): Promise<void> {
-  try {
-    await clipboardy.write(command);
-  } catch (error) {
-    throw new ClipboardError(
-      "Clipboard unavailable. Command printed below instead.",
-      error
-    );
-  }
-}
+// clipboard operations centralized in src/cli/clipboard.ts
 
 export async function startRepl(options: {
   platform: PlatformContext;
@@ -159,7 +150,7 @@ export async function startRepl(options: {
 
         if (replCommand === "copy" && lastSuggestion) {
           try {
-            await copyCommand(lastSuggestion.command);
+            await copyClipboard(lastSuggestion.command);
             output.write("Command copied to clipboard.\n");
           } catch (error) {
             if (error instanceof ClipboardError) {

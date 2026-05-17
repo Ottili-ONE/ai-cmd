@@ -1,4 +1,4 @@
-import clipboardy from "clipboardy";
+import { copyToClipboard as copyClipboard } from "./clipboard.js";
 import { Command, Option } from "commander";
 
 import { createAnalyticsClient as createDefaultAnalyticsClient } from "../analytics/client.js";
@@ -49,16 +49,7 @@ export function createDefaultDependencies(): CliDependencies {
     createProvider,
     createAnalyticsClient: createDefaultAnalyticsClient,
     createPromptAdapter,
-    copyToClipboard: async (command: string) => {
-      try {
-        await clipboardy.write(command);
-      } catch (error) {
-        throw new ClipboardError(
-          "Clipboard unavailable. Command printed below instead.",
-          error
-        );
-      }
-    },
+    copyToClipboard: copyClipboard,
     commandRunner: runCommand
   };
 }
