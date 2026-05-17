@@ -111,7 +111,9 @@ export async function startRepl(options: {
 
       const inputValue = line.trim();
 
+
       if (inputValue.length === 0) {
+        output.write('Unrecognized input, type "help" for available commands.\n');
         continue;
       }
 
@@ -202,6 +204,12 @@ export async function startRepl(options: {
             stdio: "inherit"
           });
 
+          continue;
+        }
+
+        // If input is not a recognized command and not blank, try to generate a suggestion.
+        if (!replCommand) {
+          output.write('Unrecognized input, type "help" for available commands.\n');
           continue;
         }
 
