@@ -195,7 +195,7 @@ describe("CLI integration", () => {
     );
 
     expect(stdout).toContain("AI-CMD");
-    expect(stdout).toContain("v. 1.0.3");
+    expect(stdout).toContain("v. 1.0.4");
     expect(stdout).toContain("Powered by Ottili ONE");
     expect(stdout).toContain("ottili.one");
   });
