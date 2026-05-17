@@ -71,6 +71,15 @@ type PreparedRuntime = {
   workspaceContext?: string;
 };
 
+// List of allowed shells for command-line option normalization
+const ALLOWED_SHELLS = ["bash", "zsh", "sh"];
+
+/**
+ * Normalizes CLI options and emits a warning if an unknown shell is specified.
+ *
+ * @param rawOptions Raw options as parsed from the CLI
+ * @returns Normalized CliOptions object
+ */
 function normalizeCliOptions(rawOptions: Record<string, unknown>): CliOptions {
   const options: CliOptions = {
     exec: Boolean(rawOptions.exec),
@@ -83,14 +92,17 @@ function normalizeCliOptions(rawOptions: Record<string, unknown>): CliOptions {
     copy: Boolean(rawOptions.copy)
   };
 
-  if (
-    rawOptions.shell === "bash" ||
-    rawOptions.shell === "zsh" ||
-    rawOptions.shell === "sh"
-  ) {
-    options.shell = rawOptions.shell;
+  if (typeof rawOptions.shell === "string") {
+    if (ALLOWED_SHELLS.includes(rawOptions.shell)) {
+      options.shell = rawOptions.shell as string;
+    } else {
+      // Emit a warning to stderr for unknown shell option
+      process.stderr.write(
+        `[warning] Unknown shell '${rawOptions.shell}'; supported shells are: ${ALLOWED_SHELLS.join(", ")}. Defaulting to no shell hint.\n`
+      );
+      // Do not set the shell property if unsupported
+    }
   }
-
   return options;
 }
 
