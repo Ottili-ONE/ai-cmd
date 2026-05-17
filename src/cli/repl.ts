@@ -163,7 +163,20 @@ export async function startRepl(options: {
             output.write("Command copied to clipboard.\n");
           } catch (error) {
             if (error instanceof ClipboardError) {
-              output.write(`${error.message}\n${lastSuggestion.command}\n`);
+              // Print explicit error and manual copy guidance with context, especially for WSL/headless/Windows
+              output.write(`\n[!] Clipboard operation failed: ${error.message}\n`);
+              output.write("This is common on Windows Subsystem for Linux (WSL), remote shells, or headless environments.\n");
+              output.write("\nYou can manually copy the suggested command below: \n");
+              output.write(
+                "------------------------------------------------------------\n"
+              );
+              output.write(lastSuggestion.command + "\n");
+              output.write(
+                "------------------------------------------------------------\n"
+              );
+              output.write(
+                "If your output was truncated, try using the 'last' command to show the full suggestion.\n\n"
+              );
               continue;
             }
 
