@@ -2,8 +2,7 @@ import { createHash } from "node:crypto";
 
 import type { AppConfig } from "../types/index.js";
 import { APP_NAME, APP_VERSION } from "../utils/branding.js";
-
-const TRACKING_BASE_URL = "https://tracking.ottili.one/api/aicmd";
+import { TRACKING_BASE_URL } from "./constants.js";
 const SESSION_REFRESH_BUFFER_MS = 60_000;
 
 export interface AnalyticsSession {

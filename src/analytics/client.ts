@@ -1,4 +1,5 @@
 import { APP_NAME, APP_VERSION } from "../utils/branding.js";
+import { TRACKING_BASE_URL } from "./constants.js";
 import {
   createAnalyticsProof,
   createAnalyticsSession,
@@ -6,7 +7,6 @@ import {
 } from "./session.js";
 import type { AnalyticsClient, AppConfig } from "../types/index.js";
 
-const TRACKING_BASE_URL = "https://tracking.ottili.one/api/aicmd";
 
 type SendPayload = {
   installId: string;
