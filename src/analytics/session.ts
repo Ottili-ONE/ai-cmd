@@ -1,18 +1,21 @@
 import { createHash } from "node:crypto";
 
+import { z } from "zod";
 import type { AppConfig } from "../types/index.js";
 import { APP_NAME, APP_VERSION } from "../utils/branding.js";
 
 const TRACKING_BASE_URL = "https://tracking.ottili.one/api/aicmd";
 const SESSION_REFRESH_BUFFER_MS = 60_000;
 
-export interface AnalyticsSession {
-  sessionId: string;
-  nonce: string;
-  difficulty: number;
-  expiresAt: string;
-  signature: string;
-}
+export const AnalyticsSessionSchema = z.object({
+  sessionId: z.string(),
+  nonce: z.string(),
+  difficulty: z.number().int().nonnegative(),
+  expiresAt: z.string(),
+  signature: z.string()
+});
+
+export type AnalyticsSession = z.infer<typeof AnalyticsSessionSchema>;
 
 function sha256(input: string): string {
   return createHash("sha256").update(input).digest("hex");
@@ -51,7 +54,15 @@ export async function createAnalyticsSession(
       return undefined;
     }
 
-    return (await response.json()) as AnalyticsSession;
+    // Validate the response shape before returning to avoid downstream
+    // crashes if the tracking server returns malformed payloads.
+    const parsed = await response.json();
+    const validated = AnalyticsSessionSchema.safeParse(parsed);
+    if (!validated.success) {
+      return undefined;
+    }
+
+    return validated.data;
   } catch {
     return undefined;
   } finally {
