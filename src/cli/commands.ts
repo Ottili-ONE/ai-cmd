@@ -120,7 +120,14 @@ async function prepareRuntime(
     : platform;
   const provider = deps.createProvider(config);
   const analytics = deps.createAnalyticsClient(config);
-  const workspaceContext = await inspectWorkspace(effectivePlatform.cwd);
+
+  // Gracefully handle filesystem errors in workspace inspection, fallback to undefined
+  let workspaceContext: string | undefined;
+  try {
+    workspaceContext = await inspectWorkspace(effectivePlatform.cwd);
+  } catch {
+    workspaceContext = undefined;
+  }
 
   await analytics.trackCliStart({
     os: effectivePlatform.os,
