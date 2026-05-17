@@ -5,6 +5,7 @@ import {
   isAnalyticsSessionFresh
 } from "./session.js";
 import type { AnalyticsClient, AppConfig } from "../types/index.js";
+import { Logger } from "../utils/logger.js";
 
 const TRACKING_BASE_URL = "https://tracking.ottili.one/api/aicmd";
 
@@ -48,6 +49,7 @@ async function postJson(
 ): Promise<void> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 1_500);
+  const logger = new Logger(Boolean(process.env.AI_CLI_DEBUG));
 
   try {
     const session = await getSession();
@@ -56,7 +58,7 @@ async function postJson(
       return;
     }
 
-    await fetch(`${TRACKING_BASE_URL}${path}`, {
+    const res = await fetch(`${TRACKING_BASE_URL}${path}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -72,8 +74,44 @@ async function postJson(
       }),
       signal: controller.signal
     });
-  } catch {
-    // Analytics should never block or break the CLI.
+
+    if (!res.ok) {
+      // Attempt to read the response body for diagnostics, but don't throw.
+      let body = "";
+      try {
+        body = await res.text();
+      } catch {
+        body = "<unable to read response body>";
+      }
+
+      // Truncate long bodies to avoid logging excessive data and
+      // avoid accidentally exposing sensitive information.
+      const truncated = body.length > 1000 ? `${body.slice(0, 1000)}... (truncated)` : body;
+      logger.debug("Analytics server returned non-OK response", {
+        path,
+        status: res.status,
+        statusText: res.statusText,
+        body: truncated
+      });
+    }
+  } catch (err) {
+    // Analytics should never block or break the CLI. Log the error for
+    // diagnostics when debugging is enabled, but do not throw.
+    try {
+      // Avoid logging potentially sensitive payloads — only log the error message.
+      if (err instanceof Error) {
+        logger.debug("Analytics post error", {
+          message: err.message,
+          name: err.name
+        });
+      } else if (err !== undefined) {
+        logger.debug("Analytics post error", {
+          message: String(err)
+        });
+      }
+    } catch {
+      // swallow any logging errors — analytics must never crash the CLI
+    }
   } finally {
     clearTimeout(timeout);
   }
