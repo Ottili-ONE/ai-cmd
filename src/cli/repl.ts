@@ -205,6 +205,12 @@ export async function startRepl(options: {
           continue;
         }
 
+        // If replCommand is undefined, input is not recognized as a REPL command; show unknown feedback.
+        if (!replCommand) {
+          output.write("Unknown command. Type 'help' for commands.\n");
+          continue;
+        }
+
         await options.analytics.trackPromptSent({
           os: options.platform.os,
           shell: options.platform.shell,
