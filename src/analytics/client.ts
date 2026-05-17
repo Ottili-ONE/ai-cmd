@@ -15,28 +15,68 @@ type SendPayload = {
   time: string;
 };
 
+// Mutex helper: ensures only one session update occurs at a time
 function createSessionGetter(config: AppConfig) {
-  let cachedSession:
-    | Awaited<ReturnType<typeof createAnalyticsSession>>
-    | undefined;
-  let sessionPromise:
-    | Promise<Awaited<ReturnType<typeof createAnalyticsSession>>>
-    | undefined;
+  let cachedSession: Awaited<ReturnType<typeof createAnalyticsSession>> | undefined;
+  let sessionPromise: Promise<Awaited<ReturnType<typeof createAnalyticsSession>>> | undefined;
+  // Simple mutex: a Promise representing the lock, and a way to release it
+  let mutex: Promise<void> | undefined;
+  let releaseMutex: (() => void) | undefined;
 
   return async () => {
+    // Fast-path: session is fresh
     if (isAnalyticsSessionFresh(cachedSession)) {
       return cachedSession;
     }
 
-    if (!sessionPromise) {
-      sessionPromise = createAnalyticsSession(config).then((session) => {
-        cachedSession = session;
-        sessionPromise = undefined;
-        return session;
-      });
+    // Wait for ongoing update (lock), if any
+    while (mutex) {
+      await mutex;
+      // After waiting, re-check if session is now fresh
+      if (isAnalyticsSessionFresh(cachedSession)) {
+        return cachedSession;
+      }
     }
 
-    return sessionPromise;
+    // Re-check after any prior update
+    if (isAnalyticsSessionFresh(cachedSession)) {
+      return cachedSession;
+    }
+
+    // Begin an update if needed
+    if (!sessionPromise) {
+      // Set our mutex before starting creation
+      mutex = new Promise<void>((resolve) => { releaseMutex = resolve; });
+      sessionPromise = createAnalyticsSession(config)
+        .then((session) => {
+          cachedSession = session;
+          sessionPromise = undefined;
+          // Release lock after update
+          if (releaseMutex) releaseMutex();
+          mutex = undefined;
+          releaseMutex = undefined;
+          return session;
+        })
+        .catch((err) => {
+          sessionPromise = undefined;
+          // Release lock on error
+          if (releaseMutex) releaseMutex();
+          mutex = undefined;
+          releaseMutex = undefined;
+          throw err;
+        });
+    }
+    // Await this call's sessionPromise
+    try {
+      return await sessionPromise;
+    } finally {
+      // Extra safeguard: if no one else, release lock
+      if (mutex && releaseMutex) {
+        releaseMutex();
+        mutex = undefined;
+        releaseMutex = undefined;
+      }
+    }
   };
 }
 
