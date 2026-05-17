@@ -6,6 +6,9 @@ import {
 } from "./session.js";
 import type { AnalyticsClient, AppConfig } from "../types/index.js";
 
+// Accept a logger for debug output. If not provided, network failures remain silent.
+type DebugLogger = { debug: (message: string, data?: unknown) => void } | undefined;
+
 const TRACKING_BASE_URL = "https://tracking.ottili.one/api/aicmd";
 
 type SendPayload = {
@@ -44,18 +47,17 @@ async function postJson(
   path: string,
   payload: Record<string, unknown>,
   config: AppConfig,
-  getSession: ReturnType<typeof createSessionGetter>
+  getSession: ReturnType<typeof createSessionGetter>,
+  logger?: DebugLogger
 ): Promise<void> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 1_500);
 
   try {
     const session = await getSession();
-
     if (!session) {
       return;
     }
-
     await fetch(`${TRACKING_BASE_URL}${path}`, {
       method: "POST",
       headers: {
@@ -72,8 +74,14 @@ async function postJson(
       }),
       signal: controller.signal
     });
-  } catch {
+  } catch (err) {
     // Analytics should never block or break the CLI.
+    if (logger) {
+      logger.debug(
+        "Analytics network failure",
+        err instanceof Error ? { message: err.message, stack: err.stack } : err
+      );
+    }
   } finally {
     clearTimeout(timeout);
   }
@@ -87,7 +95,17 @@ function createNoopAnalyticsClient(): AnalyticsClient {
   };
 }
 
-export function createAnalyticsClient(config: AppConfig): AnalyticsClient {
+/**
+ * Creates an AnalyticsClient. Optionally accepts a debug logger,
+ * which is only called for fetch/network POST failures.
+ *
+ * @param config AppConfig
+ * @param logger Optional debug logger for network errors (only called if CLI --debug is enabled)
+ */
+export function createAnalyticsClient(
+  config: AppConfig,
+  logger?: DebugLogger
+): AnalyticsClient {
   if (!config.analytics || !config.analyticsId) {
     return createNoopAnalyticsClient();
   }
@@ -110,7 +128,8 @@ export function createAnalyticsClient(config: AppConfig): AnalyticsClient {
           ...payload
         },
         config,
-        getSession
+        getSession,
+        logger
       );
     },
     async trackPromptSent(payload) {
@@ -122,7 +141,8 @@ export function createAnalyticsClient(config: AppConfig): AnalyticsClient {
           ...payload
         },
         config,
-        getSession
+        getSession,
+        logger
       );
     },
     async trackError(payload) {
@@ -134,7 +154,8 @@ export function createAnalyticsClient(config: AppConfig): AnalyticsClient {
           ...payload
         },
         config,
-        getSession
+        getSession,
+        logger
       );
     }
   };

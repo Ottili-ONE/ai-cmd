@@ -36,7 +36,8 @@ export interface CliDependencies {
   loadConfig: () => Promise<AppConfig>;
   detectPlatformContext: () => Promise<PlatformContext>;
   createProvider: (config: AppConfig) => AIProvider;
-  createAnalyticsClient: (config: AppConfig) => AnalyticsClient;
+  // Now can take a logger for debug mode
+  createAnalyticsClient: (config: AppConfig, logger?: { debug: (msg: string, d?: unknown) => void }) => AnalyticsClient;
   createPromptAdapter: () => PromptAdapter;
   copyToClipboard: (command: string) => Promise<void>;
   commandRunner: typeof runCommand;
@@ -47,7 +48,7 @@ export function createDefaultDependencies(): CliDependencies {
     loadConfig: () => loadOrConfigureConfig(),
     detectPlatformContext,
     createProvider,
-    createAnalyticsClient: createDefaultAnalyticsClient,
+    createAnalyticsClient: (config, logger) => createDefaultAnalyticsClient(config, logger),
     createPromptAdapter,
     copyToClipboard: async (command: string) => {
       try {
@@ -118,8 +119,10 @@ async function prepareRuntime(
   const effectivePlatform = options.shell
     ? { ...platform, shell: options.shell }
     : platform;
+  const logger = new Logger(options.debug);
+  // Only inject logger for analytics if debug is set
+  const analytics = deps.createAnalyticsClient(config, options.debug ? logger : undefined);
   const provider = deps.createProvider(config);
-  const analytics = deps.createAnalyticsClient(config);
   const workspaceContext = await inspectWorkspace(effectivePlatform.cwd);
 
   await analytics.trackCliStart({
