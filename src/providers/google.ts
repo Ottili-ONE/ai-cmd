@@ -31,9 +31,14 @@ export class GoogleProvider implements AIProvider {
     const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
 
     try {
-      const response = await fetch(
-        `${this.config.baseUrl}/models/${encodeURIComponent(this.config.model)}:generateContent?key=${encodeURIComponent(this.config.apiKey ?? "")}`,
-        {
+      const base = `${this.config.baseUrl}/models/${encodeURIComponent(
+        this.config.model
+      )}:generateContent`;
+      const url = this.config.apiKey
+        ? `${base}?key=${encodeURIComponent(this.config.apiKey)}`
+        : base;
+
+      const response = await fetch(url, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
