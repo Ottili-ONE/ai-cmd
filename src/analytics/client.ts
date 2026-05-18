@@ -30,7 +30,9 @@ function createSessionGetter(config: AppConfig) {
 
     if (!sessionPromise) {
       sessionPromise = createAnalyticsSession(config).then((session) => {
-        cachedSession = session;
+        if (session) {
+          cachedSession = session;
+        }
         sessionPromise = undefined;
         return session;
       });
