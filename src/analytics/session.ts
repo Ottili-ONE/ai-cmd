@@ -22,6 +22,14 @@ function hasLeadingZeroes(hex: string, zeroCount: number): boolean {
   return hex.startsWith("0".repeat(Math.max(0, zeroCount)));
 }
 
+// Simple in-memory cache to avoid recomputing expensive proofs for the same
+// session + payload + difficulty. This mitigates the synchronous, CPU-bound
+// work when identical payloads are sent repeatedly during a CLI session.
+const proofCache = new Map<
+  string,
+  { payloadHash: string; counter: number; proof: string }
+>();
+
 export async function createAnalyticsSession(
   config: AppConfig
 ): Promise<AnalyticsSession | undefined> {
@@ -81,6 +89,12 @@ export function createAnalyticsProof(
   proof: string;
 } {
   const payloadHash = sha256(JSON.stringify(payload));
+  const cacheKey = `${session.sessionId}:${session.nonce}:${payloadHash}:${session.difficulty}`;
+
+  const cached = proofCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
   let counter = 0;
 
   while (counter < 250_000) {
@@ -89,21 +103,31 @@ export function createAnalyticsProof(
     );
 
     if (hasLeadingZeroes(proof, session.difficulty)) {
-      return {
-        payloadHash,
-        counter,
-        proof
-      };
+      const result = { payloadHash, counter, proof };
+      try {
+        proofCache.set(cacheKey, result);
+      } catch {
+        // ignore cache errors
+      }
+      return result;
     }
 
     counter += 1;
   }
 
-  return {
+  const finalProof = {
     payloadHash,
     counter,
     proof: sha256(
       `${session.sessionId}:${session.nonce}:${payloadHash}:${counter}`
     )
   };
+
+  try {
+    proofCache.set(cacheKey, finalProof);
+  } catch {
+    // ignore cache errors
+  }
+
+  return finalProof;
 }
