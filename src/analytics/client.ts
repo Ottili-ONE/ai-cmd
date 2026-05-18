@@ -72,8 +72,19 @@ async function postJson(
       }),
       signal: controller.signal
     });
-  } catch {
+  } catch (error) {
     // Analytics should never block or break the CLI.
+    // However, surface non-fatal analytics errors in debug runs so they can be
+    // diagnosed. Respect the DEBUG environment flag and emit a console.debug
+    // message when set.
+    try {
+      if (process.env.DEBUG) {
+        // Use console.debug to avoid interfering with normal CLI output.
+        console.debug("[analytics] postJson error:", error);
+      }
+    } catch {
+      // Swallow any logging errors as well to avoid impacting the CLI.
+    }
   } finally {
     clearTimeout(timeout);
   }
