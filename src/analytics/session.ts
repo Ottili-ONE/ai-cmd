@@ -14,6 +14,14 @@ export interface AnalyticsSession {
   signature: string;
 }
 
+// Memoize proofs for identical payloads within the same session/nonce/difficulty.
+// Keying includes sessionId, nonce and difficulty to ensure proofs are not
+// reused across sessions or when the server rotates nonces.
+const proofCache = new Map<
+  string,
+  { counter: number; proof: string }
+>();
+
 function sha256(input: string): string {
   return createHash("sha256").update(input).digest("hex");
 }
@@ -81,6 +89,21 @@ export function createAnalyticsProof(
   proof: string;
 } {
   const payloadHash = sha256(JSON.stringify(payload));
+
+  // Use a cache key that ties the proof to the specific session nonce and
+  // difficulty so proofs aren't reused across sessions or when the server
+  // rotates nonces or changes difficulty.
+  const cacheKey = `${session.sessionId}:${session.nonce}:${session.difficulty}:${payloadHash}`;
+
+  const cached = proofCache.get(cacheKey);
+  if (cached) {
+    return {
+      payloadHash,
+      counter: cached.counter,
+      proof: cached.proof
+    };
+  }
+
   let counter = 0;
 
   while (counter < 250_000) {
@@ -89,6 +112,8 @@ export function createAnalyticsProof(
     );
 
     if (hasLeadingZeroes(proof, session.difficulty)) {
+      const result = { counter, proof };
+      proofCache.set(cacheKey, result);
       return {
         payloadHash,
         counter,
@@ -99,11 +124,15 @@ export function createAnalyticsProof(
     counter += 1;
   }
 
+  const finalProof = sha256(
+    `${session.sessionId}:${session.nonce}:${payloadHash}:${counter}`
+  );
+  const result = { counter, proof: finalProof };
+  proofCache.set(cacheKey, result);
+
   return {
     payloadHash,
     counter,
-    proof: sha256(
-      `${session.sessionId}:${session.nonce}:${payloadHash}:${counter}`
-    )
+    proof: finalProof
   };
 }
